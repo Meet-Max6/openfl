@@ -45,6 +45,7 @@ class Director:
         envoy_health_check_period (int): The period for health check of envoys
             in seconds.
         authorized_cols (list): A list of authorized envoys
+        review_callback (Optional[Callable]): A callback function for reviewing experiments.
     """
 
     def __init__(
@@ -57,6 +58,7 @@ class Director:
         director_config: Optional[Path] = None,
         envoy_health_check_period: int = 60,
         install_requirements: bool = True,
+        review_callback = None,  # Add review_callback parameter
     ) -> None:
         """Initialize a Director object.
 
@@ -74,6 +76,7 @@ class Director:
             in seconds.
             install_requirements (bool, optional): A flag indicating if the
                 requirements should be installed. Defaults to True.
+            review_callback (Optional[Callable]): A callback function for reviewing experiments.
         """
         self.tls = tls
         self.root_certificate = root_certificate
@@ -82,7 +85,7 @@ class Director:
         self.director_config = director_config
         self.install_requirements = install_requirements
         self._flow_status = asyncio.Queue()
-
+        self.review_callback = review_callback  # Store the review_callback
         self.experiments_registry = ExperimentsRegistry()
         self.col_exp = {}
         self.col_exp_queues = defaultdict(asyncio.Queue)
@@ -97,7 +100,9 @@ class Director:
         while True:
             try:
                 async with self.experiments_registry.get_next_experiment() as experiment:
+
                     await self._wait_for_authorized_envoys()
+
                     run_aggregator_future = loop.create_task(
                         experiment.start(
                             root_certificate=self.root_certificate,
@@ -108,13 +113,16 @@ class Director:
                             install_requirements=False,
                         )
                     )
+
                     # Adding the experiment to collaborators queues
                     for col_name in experiment.collaborators:
                         queue = self.col_exp_queues[col_name]
                         await queue.put(experiment.name)
+
                     # Wait for the experiment to complete and save the result
                     flow_status = await run_aggregator_future
                     await self._flow_status.put(flow_status)
+
             except Exception as e:
                 logger.error(f"Error while executing experiment: {e}")
                 raise
@@ -165,6 +173,44 @@ class Director:
 
         return experiment_name
 
+    # async def set_new_experiment(
+    #     self,
+    #     experiment_name: str,
+    #     sender_name: str,
+    #     collaborator_names: Iterable[str],
+    #     experiment_archive_path: Path,
+    # ) -> bool:
+    #     """Set new experiment.
+
+    #     Args:
+    #         experiment_name (str): String id for experiment.
+    #         sender_name (str): The name of the sender.
+    #         collaborator_names (Iterable[str]): Names of collaborators.
+    #         experiment_archive_path (Path): Path of the experiment.
+
+    #     Returns:
+    #         bool : Boolean returned if the experiment register was successful.
+    #     """
+    #     experiment = Experiment(
+    #         name=experiment_name,
+    #         archive_path=experiment_archive_path,
+    #         collaborators=collaborator_names,
+    #         users=[sender_name],
+    #         sender=sender_name,
+    #     )
+    #     # Check if review callback is enabled
+    #     if self.review_callback:
+    #         review_approved = await experiment.review_experiment(self.review_callback)
+    #         if not review_approved:
+    #             logger.warning(f"Experiment '{experiment_name}' was rejected❌ by the Admin.")
+    #             return False # Experiment rejected
+
+    #     # Add the experiment to the registry
+    #     self.authorized_cols = collaborator_names
+    #     self.experiments_registry.add(experiment)
+    #     logger.info(f"Experiment '{experiment_name}' was approved✅ and added to the registry.")
+    #     return True # Experiment approved
+
     async def set_new_experiment(
         self,
         experiment_name: str,
@@ -172,16 +218,17 @@ class Director:
         collaborator_names: Iterable[str],
         experiment_archive_path: Path,
     ) -> bool:
-        """Set new experiment.
+        """
+        Set and optionally review a new federated experiment.
 
         Args:
-            experiment_name (str): String id for experiment.
-            sender_name (str): The name of the sender.
-            collaborator_names (Iterable[str]): Names of collaborators.
-            experiment_archive_path (Path): Path of the experiment.
+            experiment_name (str): Identifier for the new experiment.
+            sender_name (str): Initiator of the experiment.
+            collaborator_names (Iterable[str]): Participating collaborators.
+            experiment_archive_path (Path): Path to the experiment archive.
 
         Returns:
-            bool : Boolean returned if the experiment register was successful.
+            bool: True if the experiment is accepted and registered; False otherwise.
         """
         experiment = Experiment(
             name=experiment_name,
@@ -191,9 +238,19 @@ class Director:
             sender=sender_name,
         )
 
+        # Run review process if review callback is configured
+        if self.review_callback:
+            is_approved = await experiment.review_experiment(self.review_callback)
+            if not is_approved:
+                logger.warning(f"❌ Experiment '{experiment_name}' was rejected during review.")
+                return False
+
+        # Register the approved experiment
         self.authorized_cols = collaborator_names
         self.experiments_registry.add(experiment)
+        logger.info(f"✅ Experiment '{experiment_name}' approved and registered successfully.")
         return True
+
 
     async def stream_experiment_stdout(
         self, experiment_name: str, caller: str
@@ -233,6 +290,35 @@ class Director:
             else:
                 # Yield none if the queue is empty but the experiment is still running.
                 yield None
+    
+    async def send_experiment_to_envoys_for_review(self, experiment: Experiment) -> bool:
+        """Send experiment to envoys for review.
+
+        Args:
+            experiment (Experiment): The experiment to be sent.
+
+        Returns:
+            bool: True if all envoys approve the experiment, False otherwise.
+        """
+        # Send the experiment to envoys for review
+        # This is a placeholder implementation. Replace with actual logic.
+        logger.info(f"Sending experiment {experiment.name} to envoys for review.")
+        # Send the experiment to each envoy for review
+        for envoy_name in self.authorized_cols:
+            try:
+                queue = self.col_exp_queues[envoy_name]
+                await queue.put(experiment.name)
+                logger.info(f"Sent review request for experiment '{experiment.name}' to envoy '{envoy_name}'.")
+            except Exception as e:
+
+                logger.error(f"Failed to send review request to envoy '{envoy_name}': {e}")
+                # Directly update review_responses with a rejection if sending fails
+                #self.process_review_response(envoy_name, experiment.name, "REJECT")
+                return False    
+        return False #simulating the review process for now in which envoys reject the experiment
+    
+        
+    
 
     def get_experiment_data(self, experiment_name: str) -> Path:
         """Get experiment data.

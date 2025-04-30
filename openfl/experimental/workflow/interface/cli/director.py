@@ -15,6 +15,7 @@ from openfl.experimental.workflow.component.director import Director
 from openfl.experimental.workflow.transport import DirectorGRPCServer
 from openfl.utilities import merge_configs
 from openfl.utilities.path_check import is_directory_traversal
+from openfl.experimental.workflow.interface.cli.cli_helper import review_plan_callback
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ def start(director_config_path, tls, root_certificate, private_key, certificate)
                 gte=1,
                 lte=24 * 60 * 60,
             ),
+            Validator("settings.review_experiment", default=False),
         ],
     )
 
@@ -116,6 +118,14 @@ def start(director_config_path, tls, root_certificate, private_key, certificate)
     if config.certificate:
         config.certificate = Path(config.certificate).absolute()
 
+    # Setup review_callback based on the configuration
+    review_callback = review_plan_callback if config.settings.review_experiment else None
+    logger.info(
+        "Experiment review mode is %s.",
+        "enabled" if review_callback else "disabled"
+    )
+
+
     director_server = DirectorGRPCServer(
         director_cls=Director,
         tls=tls,
@@ -127,5 +137,6 @@ def start(director_config_path, tls, root_certificate, private_key, certificate)
         envoy_health_check_period=config.settings.envoy_health_check_period,
         install_requirements=config.settings.install_requirements,
         director_config=director_config_path,
+        review_callback=review_callback
     )
     director_server.start()

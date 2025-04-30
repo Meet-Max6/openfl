@@ -126,13 +126,19 @@ class FLSpec:
 
     def run(self) -> None:
         """Starts the execution of the flow."""
-        # Submit flow to Runtime
-        if str(self._runtime) == "LocalRuntime":
-            self._run_local()
-        elif str(self._runtime) == "FederatedRuntime":
-            self._run_federated()
-        else:
-            raise Exception("Runtime not implemented")
+        try:
+            # Submit flow to Runtime
+            if str(self._runtime) == "LocalRuntime":
+                self._run_local()
+            elif str(self._runtime) == "FederatedRuntime":
+                self._run_federated()
+            else:
+                raise Exception("Runtime not implemented")
+        except Exception as e:
+            # Stop execution and print error message
+            print(f"\033[91m❌ Flow execution stopped: {e}\033[0m")
+            raise
+        
 
     def _run_local(self) -> None:
         """Executes the flow using LocalRuntime."""
@@ -186,14 +192,24 @@ class FLSpec:
         try:
             # Prepare workspace and submit it for the FederatedRuntime
             archive_path, exp_name = self.runtime.prepare_workspace_archive()
-            self.runtime.submit_experiment(archive_path, exp_name)
+            submission_result = self.runtime.submit_experiment(archive_path, exp_name)
+
+            if not submission_result:
+              print(f"\033[91m❌ Experiment '{exp_name}' was rejected by the Director.\033[0m")
+              raise Exception(f"Experiment '{exp_name}' submission was rejected. Stopping execution.")
+            
+            print(f"\033[92m✅ Experiment '{exp_name}' approved and running.\033[0m")
+            
             # Stream the experiment's stdout if the checkpoint is enabled
             if self._checkpoint:
                 self.runtime.stream_experiment_stdout(exp_name)
+            
             # Retrieve the flspec object to update the experiment state
             flspec_obj = self._get_flow_state()
+            
             # Update state of self
             self._update_from_flspec_obj(flspec_obj)
+        
         except Exception as e:
             raise Exception(
                 f"FederatedRuntime: Experiment {exp_name} failed to run due to error: {e}"

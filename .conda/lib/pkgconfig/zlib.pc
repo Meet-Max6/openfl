@@ -1,0 +1,13 @@
+prefix=/home/meet/openfl_meet/openfl/.conda
+exec_prefix=/home/meet/openfl_meet/openfl/.conda
+libdir=/home/meet/openfl_meet/openfl/.conda/lib
+sharedlibdir=/home/meet/openfl_meet/openfl/.conda/lib
+includedir=/home/meet/openfl_meet/openfl/.conda/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.13
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}
