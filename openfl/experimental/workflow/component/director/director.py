@@ -173,44 +173,6 @@ class Director:
 
         return experiment_name
 
-    # async def set_new_experiment(
-    #     self,
-    #     experiment_name: str,
-    #     sender_name: str,
-    #     collaborator_names: Iterable[str],
-    #     experiment_archive_path: Path,
-    # ) -> bool:
-    #     """Set new experiment.
-
-    #     Args:
-    #         experiment_name (str): String id for experiment.
-    #         sender_name (str): The name of the sender.
-    #         collaborator_names (Iterable[str]): Names of collaborators.
-    #         experiment_archive_path (Path): Path of the experiment.
-
-    #     Returns:
-    #         bool : Boolean returned if the experiment register was successful.
-    #     """
-    #     experiment = Experiment(
-    #         name=experiment_name,
-    #         archive_path=experiment_archive_path,
-    #         collaborators=collaborator_names,
-    #         users=[sender_name],
-    #         sender=sender_name,
-    #     )
-    #     # Check if review callback is enabled
-    #     if self.review_callback:
-    #         review_approved = await experiment.review_experiment(self.review_callback)
-    #         if not review_approved:
-    #             logger.warning(f"Experiment '{experiment_name}' was rejected❌ by the Admin.")
-    #             return False # Experiment rejected
-
-    #     # Add the experiment to the registry
-    #     self.authorized_cols = collaborator_names
-    #     self.experiments_registry.add(experiment)
-    #     logger.info(f"Experiment '{experiment_name}' was approved✅ and added to the registry.")
-    #     return True # Experiment approved
-
     async def set_new_experiment(
         self,
         experiment_name: str,
@@ -292,7 +254,8 @@ class Director:
                 yield None
     
     async def send_experiment_to_envoys_for_review(self, experiment: Experiment) -> bool:
-        """Send experiment to envoys for review.
+        """ 
+        Send the experiment plan to all authorized envoys for review.
 
         Args:
             experiment (Experiment): The experiment to be sent.
@@ -300,26 +263,19 @@ class Director:
         Returns:
             bool: True if all envoys approve the experiment, False otherwise.
         """
-        # Send the experiment to envoys for review
-        # This is a placeholder implementation. Replace with actual logic.
+        
         logger.info(f"Sending experiment {experiment.name} to envoys for review.")
-        # Send the experiment to each envoy for review
+       
         for envoy_name in self.authorized_cols:
             try:
                 queue = self.col_exp_queues[envoy_name]
                 await queue.put(experiment.name)
                 logger.info(f"Sent review request for experiment '{experiment.name}' to envoy '{envoy_name}'.")
             except Exception as e:
-
                 logger.error(f"Failed to send review request to envoy '{envoy_name}': {e}")
-                # Directly update review_responses with a rejection if sending fails
-                #self.process_review_response(envoy_name, experiment.name, "REJECT")
-                return False    
-        return False #simulating the review process for now in which envoys reject the experiment
+                return False  # Abort if sending fails for any envoy  
+        return False
     
-        
-    
-
     def get_experiment_data(self, experiment_name: str) -> Path:
         """Get experiment data.
 

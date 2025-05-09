@@ -135,7 +135,6 @@ class FLSpec:
             else:
                 raise Exception("Runtime not implemented")
         except Exception as e:
-            # Stop execution and print error message
             print(f"\033[91m❌ Flow execution stopped: {e}\033[0m")
             raise
         

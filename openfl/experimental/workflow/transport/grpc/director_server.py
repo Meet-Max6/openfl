@@ -314,7 +314,6 @@ class DirectorGRPCServer(director_pb2_grpc.DirectorServicer):
             experiment_archive_path=data_file_path,
         )
 
-        #logger.info("Experiment %s registered", request.name)
         logger.info(f"Experiment '{request.name}' registration status: {'Approved' if is_accepted else 'Rejected'}")
         return director_pb2.SetNewExperimentResponse(status=is_accepted)
 

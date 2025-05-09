@@ -139,11 +139,14 @@ class Envoy:
             try:
                 # Wait for experiment from Director server
                 experiment_name = self._envoy_dir_client.wait_experiment()
+                # Fetch the experiment data stream from the Director server
                 data_stream = self._envoy_dir_client.get_experiment_data(experiment_name)
             except Exception as exc:
-                logger.exception("Failed to get experiment: %s", exc)
+                logger.exception("Failed to retrieve experiment from Director: %s", exc)
                 time.sleep(self.DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
                 continue
+
+            # Persist the received data stream into a local file
             data_file_path = self._save_data_stream_to_file(data_stream)
 
             try:
@@ -159,27 +162,14 @@ class Envoy:
                             logger.info("⚠️ Experiment plan review failed.")
                             continue
 
-                    # If review_plan_callback is provided, call it
-                    # with the plan config path and the data file path
-                    #if self.review_callback:
-                        # envoy to review the experiment before running
-                       # logger.info("🧿 Reviewing the experiment plan before running...")
-                       # if not self.review_callback('plan','plan/plan.yaml'):
-                        #if not self.review_callback(
-                        #    file_name=self.plan,
-                        #    file_path=data_file_path,
-                        #):
-                       #     logger.info("⚠️ Experiment plan review failed.")
-                            #self._envoy_dir_client. TBD
-                       #     continue
-                    # Run the experiment
+                    # Start the experiment
                     logger.info("🚀 Starting the experiment...")
-                    # Set the experiment running flag to True to indicate that experiment is running
-                    self.is_experiment_running = True
+                    self.is_experiment_running = True # Flag to indicate experiment is running
                     self._run_collaborator()
             except Exception as exc:
                 logger.exception("Collaborator failed with error: %s:", exc)
             finally:
+                # Reset the experiment running flag after execution completes or fails
                 self.is_experiment_running = False
 
     @staticmethod
