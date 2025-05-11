@@ -40,6 +40,8 @@ class Envoy:
         executor (ThreadPoolExecutor): The executor for running tasks.
         plan(str): Path to plan.yaml
         _health_check_future (object): The future object for the health check.
+        review_callback (Optional[Callable]): A callback function for reviewing experiment plan.
+            Defaults to None.
     """
 
     DEFAULT_RETRY_TIMEOUT_IN_SECONDS = 5
@@ -56,7 +58,7 @@ class Envoy:
         certificate: Optional[Union[Path, str]] = None,
         tls: bool = True,
         install_requirements: bool = True,
-        review_callback: Union[None,Callable] = None,
+        review_callback: Optional[Callable] = None,
     ) -> None:
         """Initialize a envoy object.
 
@@ -75,6 +77,8 @@ class Envoy:
                 connections. Defaults to True.
             install_requirements (bool, optional): A flag indicating if the
                 requirements should be installed. Defaults to True.
+            review_callback (Optional[Callable]): A callback function for reviewing experiment plan. 
+                Defaults to None.
         """
         self.name = envoy_name
         self.envoy_config = envoy_config
@@ -158,8 +162,8 @@ class Envoy:
                     if self.review_callback:
                         # envoy to review the experiment before running
                         logger.info("🧿 Reviewing the experiment plan before running...")
-                        if not self.review_callback('plan', 'plan/plan.yaml'):
-                            logger.info("⚠️ Experiment plan review failed.")
+                        if not self.review_callback(experiment_name, 'plan/plan.yaml'):
+                            logger.info("❌ Experiment '{experiment_name}' plan review failed.")
                             continue
 
                     # Start the experiment

@@ -9,7 +9,7 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, Iterable, Optional, Tuple, Union
+from typing import Any, AsyncGenerator, Dict, Iterable, Optional, Tuple, Union, Callable
 
 import dill
 
@@ -45,7 +45,8 @@ class Director:
         envoy_health_check_period (int): The period for health check of envoys
             in seconds.
         authorized_cols (list): A list of authorized envoys
-        review_callback (Optional[Callable]): A callback function for reviewing experiments.
+        review_callback (Optional[Callable]): A callback function for reviewing experiment plan.
+            Defaults to None.
     """
 
     def __init__(
@@ -58,7 +59,7 @@ class Director:
         director_config: Optional[Path] = None,
         envoy_health_check_period: int = 60,
         install_requirements: bool = True,
-        review_callback = None,  # Add review_callback parameter
+        review_callback: Optional[Callable] = None,  # Add review_callback parameter
     ) -> None:
         """Initialize a Director object.
 
@@ -76,7 +77,8 @@ class Director:
             in seconds.
             install_requirements (bool, optional): A flag indicating if the
                 requirements should be installed. Defaults to True.
-            review_callback (Optional[Callable]): A callback function for reviewing experiments.
+            review_callback (Optional[Callable]): A callback function for reviewing experiment plan.
+                Defaults to None.
         """
         self.tls = tls
         self.root_certificate = root_certificate
@@ -202,6 +204,7 @@ class Director:
 
         # Run review process if review callback is configured
         if self.review_callback:
+            logger.info("🧿 Reviewing the experiment plan for '{experiment_name}' before running...")
             is_approved = await experiment.review_experiment(self.review_callback)
             if not is_approved:
                 logger.warning(f"❌ Experiment '{experiment_name}' was rejected during review.")
@@ -210,7 +213,9 @@ class Director:
         # Register the approved experiment
         self.authorized_cols = collaborator_names
         self.experiments_registry.add(experiment)
+        
         logger.info(f"✅ Experiment '{experiment_name}' approved and registered successfully.")
+        
         return True
 
 

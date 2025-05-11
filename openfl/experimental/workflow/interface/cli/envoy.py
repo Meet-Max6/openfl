@@ -138,8 +138,6 @@ def start_(
     else:
         install_requirements = False
 
-
-
     if config.root_certificate:
         config.root_certificate = Path(config.root_certificate).absolute()
     if config.private_key:

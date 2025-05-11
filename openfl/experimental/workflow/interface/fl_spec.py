@@ -187,15 +187,20 @@ class FLSpec:
             print(f"Created flow {self.__class__.__name__}")
 
     def _run_federated(self) -> None:
-        """Executes the flow using FederatedRuntime."""
+        """
+        Executes the flow using FederatedRuntime.
+        
+        Raises:
+            Exception: If submission is rejected or execution fails.
+        """
         try:
             # Prepare workspace and submit it for the FederatedRuntime
             archive_path, exp_name = self.runtime.prepare_workspace_archive()
-            submission_result = self.runtime.submit_experiment(archive_path, exp_name)
+            is_submission_approved  = self.runtime.submit_experiment(archive_path, exp_name)
 
-            if not submission_result:
+            if not is_submission_approved :
               print(f"\033[91m❌ Experiment '{exp_name}' was rejected by the Director.\033[0m")
-              raise Exception(f"Experiment '{exp_name}' submission was rejected. Stopping execution.")
+              raise Exception(f"Submission of experiment '{exp_name}' was rejected. Stopping execution.")
             
             print(f"\033[92m✅ Experiment '{exp_name}' approved and running.\033[0m")
             
@@ -203,11 +208,9 @@ class FLSpec:
             if self._checkpoint:
                 self.runtime.stream_experiment_stdout(exp_name)
             
-            # Retrieve the flspec object to update the experiment state
-            flspec_obj = self._get_flow_state()
-            
-            # Update state of self
-            self._update_from_flspec_obj(flspec_obj)
+            # Retrieve federated learning spec and update local state
+            flspec = self._get_flow_state()
+            self._update_from_flspec_obj(flspec)
         
         except Exception as e:
             raise Exception(

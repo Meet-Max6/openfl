@@ -121,7 +121,7 @@ def start(director_config_path, tls, root_certificate, private_key, certificate)
     # Setup review_callback based on the configuration
     review_callback = review_plan_callback if config.settings.review_experiment else None
     logger.info(
-        "Experiment review mode is %s.",
+        "Experiment Plan Review Mode is %s.",
         "enabled" if review_callback else "disabled"
     )
 
