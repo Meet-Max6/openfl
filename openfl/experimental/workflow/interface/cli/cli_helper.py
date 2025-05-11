@@ -156,7 +156,7 @@ def review_plan_callback(file_name: str, file_path) -> bool:
     """
     DISPLAY_DELAY_SECONDS = 3
 
-    echo(style(f"Please review the contents of experiment plan {file_name} before proceeding...", fg="green", bold=True))
+    echo(style(f"Please review the contents of experiment plan {file_name} before proceeding...", fg="yellow", bold=True))
     time.sleep(DISPLAY_DELAY_SECONDS)
 
     try:
@@ -166,7 +166,7 @@ def review_plan_callback(file_name: str, file_path) -> bool:
         echo(style(f"⚠️ Failed to read file: {e}", fg="red", bold=True))
         return False
 
-    if confirm(style(f"Do you want to accept the plan {file_name}❔", fg="green", bold=True)):
+    if confirm(style(f"Do you want to accept the plan {file_name}❔", fg="yellow", bold=True)):
         echo(style(f"{file_name} accepted!", fg="green", bold=True))
         return True
 
