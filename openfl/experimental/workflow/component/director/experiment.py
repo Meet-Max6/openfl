@@ -9,7 +9,7 @@ import logging
 from contextlib import asynccontextmanager
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Tuple, Union
+from typing import Any, Iterable, List, Optional, Tuple, Union, Callable
 
 from openfl.experimental.workflow.federated import Plan
 from openfl.experimental.workflow.transport import AggregatorGRPCServer
@@ -141,6 +141,33 @@ class Experiment:
             raise
 
         return self.status == Status.FINISHED, self.updated_flow
+
+    
+    async def review_experiment(self, review_plan_callback: Callable[[str, Path], bool]) -> bool:
+        """Review the experiment plan using the callback.
+
+        Args:
+            review_plan_callback (Callable): Callback to review the plan.
+
+        Returns:
+            bool: True if approved, False otherwise.
+        """
+        with ExperimentWorkspace(
+            self.name,
+            self.archive_path,
+            install_requirements=False,
+            remove_archive=False
+        ):
+           
+            is_approved = await asyncio.to_thread(review_plan_callback, self.name, self.plan_path)
+
+
+            if not is_approved:
+                self.status = Status.REJECTED
+                self.archive_path.unlink(missing_ok=True)
+                return False
+
+            return True
 
     def _create_aggregator_grpc_server(
         self,

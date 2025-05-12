@@ -229,38 +229,6 @@ def error_handler(error):
     raise error
 
 
-def review_plan_callback(file_name, file_path):
-    """
-    Review plan callback for Director and Envoy.
-
-    Args:
-        file_name (str): Name of the file to review.
-        file_path (str): Path of the file to review.
-
-    Returns:
-        bool: True if the file is accepted, False otherwise.
-    """
-    echo(
-        style(
-            f"Please review the contents of {file_name} before proceeding...",
-            fg="green",
-            bold=True,
-        )
-    )
-    # Wait for users to read the question before flashing the contents of the file.
-    time.sleep(3)
-
-    with open_file(file_path, "r") as f:
-        echo(f.read())
-
-    if confirm(style(f"Do you want to accept the {file_name}?", fg="green", bold=True)):
-        echo(style(f"{file_name} accepted!", fg="green", bold=True))
-        return True
-    else:
-        echo(style(f"EXCEPTION: {file_name} rejected!", fg="red", bold=True))
-        return False
-
-
 def show_header():
     """Show header."""
 

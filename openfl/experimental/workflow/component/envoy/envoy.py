@@ -9,7 +9,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 
 from openfl.experimental.workflow.federated import Plan
 from openfl.experimental.workflow.transport.grpc.director_client import EnvoyDirectorClient
@@ -40,6 +40,8 @@ class Envoy:
         executor (ThreadPoolExecutor): The executor for running tasks.
         plan(str): Path to plan.yaml
         _health_check_future (object): The future object for the health check.
+        review_callback (Optional[Callable]): A callback function for reviewing experiment plan.
+            Defaults to None.
     """
 
     DEFAULT_RETRY_TIMEOUT_IN_SECONDS = 5
@@ -56,6 +58,7 @@ class Envoy:
         certificate: Optional[Union[Path, str]] = None,
         tls: bool = True,
         install_requirements: bool = True,
+        review_callback: Optional[Callable] = None,
     ) -> None:
         """Initialize a envoy object.
 
@@ -74,6 +77,8 @@ class Envoy:
                 connections. Defaults to True.
             install_requirements (bool, optional): A flag indicating if the
                 requirements should be installed. Defaults to True.
+            review_callback (Optional[Callable]): A callback function for reviewing experiment plan. 
+                Defaults to None.
         """
         self.name = envoy_name
         self.envoy_config = envoy_config
@@ -87,6 +92,7 @@ class Envoy:
         # experiment workspace provided by the director
         self.plan = "plan/plan.yaml"
         self._health_check_future = None
+        self.review_callback = review_callback
 
     def _create_envoy_dir_client(
         self, director_host: str, director_port: int
@@ -137,11 +143,14 @@ class Envoy:
             try:
                 # Wait for experiment from Director server
                 experiment_name = self._envoy_dir_client.wait_experiment()
+                # Fetch the experiment data stream from the Director server
                 data_stream = self._envoy_dir_client.get_experiment_data(experiment_name)
             except Exception as exc:
-                logger.exception("Failed to get experiment: %s", exc)
+                logger.exception("Failed to retrieve experiment from Director: %s", exc)
                 time.sleep(self.DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
                 continue
+
+            # Persist the received data stream into a local file
             data_file_path = self._save_data_stream_to_file(data_stream)
 
             try:
@@ -150,12 +159,36 @@ class Envoy:
                     data_file_path=data_file_path,
                     install_requirements=self.install_requirements,
                 ):
-                    self.is_experiment_running = True
+                    if not self._review_experiment_if_required(experiment_name):
+                        continue
+
+                    logger.info("🚀 Starting the experiment...")
+                    self.is_experiment_running = True # Flag to indicate experiment is running
+                   
                     self._run_collaborator()
             except Exception as exc:
                 logger.exception("Collaborator failed with error: %s:", exc)
             finally:
+                # Reset the experiment running flag after execution completes or fails
                 self.is_experiment_running = False
+
+    def _review_experiment_if_required(self, experiment_name: str) -> bool:
+        """
+        Run the review callback if configured.
+
+        Args:
+            experiment_name (str): Name of the experiment.
+
+        Returns:
+            bool: True if the review passes or no review is needed; False otherwise.
+        """
+        if self.review_callback:
+            logger.info("🧿 Reviewing the experiment plan before running...")
+            approved = self.review_callback(experiment_name, 'plan/plan.yaml')
+            if not approved:
+                logger.info(f"❌ Experiment '{experiment_name}' plan review failed.")
+                return False
+        return True
 
     @staticmethod
     def _save_data_stream_to_file(data_stream) -> Path:
