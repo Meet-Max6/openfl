@@ -59,7 +59,7 @@ class Director:
         director_config: Optional[Path] = None,
         envoy_health_check_period: int = 60,
         install_requirements: bool = True,
-        review_callback: Optional[Callable] = None,  # Add review_callback parameter
+        review_callback: Optional[Callable] = None,
     ) -> None:
         """Initialize a Director object.
 
@@ -87,7 +87,7 @@ class Director:
         self.director_config = director_config
         self.install_requirements = install_requirements
         self._flow_status = asyncio.Queue()
-        self.review_callback = review_callback  # Store the review_callback
+        self.review_callback = review_callback
         self.experiments_registry = ExperimentsRegistry()
         self.col_exp = {}
         self.col_exp_queues = defaultdict(asyncio.Queue)
@@ -102,7 +102,6 @@ class Director:
         while True:
             try:
                 async with self.experiments_registry.get_next_experiment() as experiment:
-
                     await self._wait_for_authorized_envoys()
 
                     run_aggregator_future = loop.create_task(
@@ -203,12 +202,9 @@ class Director:
         )
  
         # Run review process if review callback is configured
-        if self.review_callback:
-            logger.info("🧿 Reviewing the experiment plan for '{experiment_name}' before running...")
-            is_approved = await experiment.review_experiment(self.review_callback)
-            if not is_approved:
-                logger.warning(f"❌ Experiment '{experiment_name}' was rejected during review.")
-                return False
+        is_approved = await self._review_experiment_if_required(experiment)
+        if not is_approved:
+            return False
 
         # Register the approved experiment
         self.authorized_cols = collaborator_names
@@ -218,6 +214,23 @@ class Director:
         
         return True
 
+    async def _review_experiment_if_required(self, experiment: Experiment) -> bool:
+        """
+        Reviews the experiment and returns approval status.
+
+        Args:
+            experiment (Experiment): The experiment to review.
+
+        Returns:
+            bool: True if the experiment is approved or no review is required; False otherwise.
+        """
+        if self.review_callback:
+            logger.info(f"🧿 Reviewing the experiment plan for '{experiment.name}' before running...")
+            is_approved = await experiment.review_experiment(self.review_callback)
+            if not is_approved:
+                logger.warning(f"❌ Experiment '{experiment.name}' was rejected during review.")
+                return False
+        return True
 
     async def stream_experiment_stdout(
         self, experiment_name: str, caller: str

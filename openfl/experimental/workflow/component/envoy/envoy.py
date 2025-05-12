@@ -159,22 +159,36 @@ class Envoy:
                     data_file_path=data_file_path,
                     install_requirements=self.install_requirements,
                 ):
-                    if self.review_callback:
-                        # envoy to review the experiment before running
-                        logger.info("🧿 Reviewing the experiment plan before running...")
-                        if not self.review_callback(experiment_name, 'plan/plan.yaml'):
-                            logger.info("❌ Experiment '{experiment_name}' plan review failed.")
-                            continue
+                    if not self._review_experiment_if_required(experiment_name):
+                        continue
 
-                    # Start the experiment
                     logger.info("🚀 Starting the experiment...")
                     self.is_experiment_running = True # Flag to indicate experiment is running
+                   
                     self._run_collaborator()
             except Exception as exc:
                 logger.exception("Collaborator failed with error: %s:", exc)
             finally:
                 # Reset the experiment running flag after execution completes or fails
                 self.is_experiment_running = False
+
+    def _review_experiment_if_required(self, experiment_name: str) -> bool:
+        """
+        Run the review callback if configured.
+
+        Args:
+            experiment_name (str): Name of the experiment.
+
+        Returns:
+            bool: True if the review passes or no review is needed; False otherwise.
+        """
+        if self.review_callback:
+            logger.info("🧿 Reviewing the experiment plan before running...")
+            approved = self.review_callback(experiment_name, 'plan/plan.yaml')
+            if not approved:
+                logger.info(f"❌ Experiment '{experiment_name}' plan review failed.")
+                return False
+        return True
 
     @staticmethod
     def _save_data_stream_to_file(data_stream) -> Path:
